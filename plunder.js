@@ -118,6 +118,37 @@ function loadSlot(n){
 }
 
 // ============================================================
+// BOT-SCHUTZ CHECK
+// ============================================================
+function botCheck(){
+  if($('div#bot_check,div#popup_box_bot_protection').length){
+    $('div#bot_check,div#popup_box_bot_protection').find('iframe')
+      .css('padding','4px 3px 2px 4px')
+      .css('background-color','#e8c97a');
+    document.title='⚠ BOT CHECK!';
+    return false;
+  }
+  return true;
+}
+
+var botPollTimer=null;
+function waitForBotClear(callback){
+  if(botCheck())return true;
+  setStatus("&#9888; Bot-Check erkannt! Bitte loesen ...","#e05555");
+  clearInterval(botPollTimer);
+  botPollTimer=setInterval(function(){
+    if(!$('div#bot_check,div#popup_box_bot_protection').length){
+      clearInterval(botPollTimer);
+      botPollTimer=null;
+      document.title=game_data.village.name||'Die Staemme';
+      setStatus("&#10004; Bot-Check geloest — setze fort ...","#5cb85c");
+      setTimeout(callback,2000);
+    }
+  },3000);
+  return false;
+}
+
+// ============================================================
 // VOLLAUTOMATISCHES ABSENDEN
 // ============================================================
 function setStatus(msg,color){
@@ -128,6 +159,7 @@ function sendBatches(bt,onDone){
   var i=0;
   function next(){
     if(i>=bt.length){if(onDone)onDone();return}
+    if(!waitForBotClear(next))return;
     var idx=i; i++;
     setStatus("Sende Paket "+(idx+1)+" von "+bt.length+" ...","#c9a84c");
     TribalWars.post("scavenge_api",{ajaxaction:"send_squads"},{squad_requests:bt[idx]},function(){
@@ -138,6 +170,7 @@ function sendBatches(bt,onDone){
 }
 
 function buildAndSend(s,autoRepeat){
+  if(!waitForBotClear(function(){buildAndSend(s,autoRepeat)}))return;
   stopCountdown();
   setStatus("Lade Doerfer ...","#c9a84c");
   isRunning=true;
