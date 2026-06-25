@@ -48,13 +48,7 @@ function loadSettings(){
     var raw=localStorage.getItem(SK);
     if(!raw)return;
     var cfg=JSON.parse(raw);
-    if(cfg.use)$(".mu").each(function(){var u=$(this).data("u");if(cfg.use[u]!==undefined)$(this).prop("checked",cfg.use[u])});
-    if(cfg.keep)$(".mk").each(function(){var u=$(this).data("u");if(u&&cfg.keep[u]!==undefined)$(this).val(cfg.keep[u])});
-    if(cfg.mode)$("input[name=mm][value='"+cfg.mode+"']").prop("checked",true);
-    if(cfg.maxH)$("#mqT").val(cfg.maxH);
-    if(cfg.cats)$(".mc").each(function(){var c=$(this).data("c");if(cfg.cats[c]!==undefined)$(this).prop("checked",cfg.cats[c])});
-    if(cfg.auto!==undefined)$("#mqauto").prop("checked",cfg.auto);
-    if(cfg.interval)$("#mqI").val(cfg.interval);
+    applySettings(cfg);
     if(cfg.group)window.__mqSavedGroup=cfg.group;
   }catch(e){}
 }
@@ -81,6 +75,46 @@ function stopCountdown(){
   clearInterval(cdTimer);
   cdTimer=null;
   $("#mqcd").hide();
+}
+
+// ============================================================
+// SETTINGS SLOTS
+// ============================================================
+function applySettings(cfg){
+  if(cfg.use)$(".mu").each(function(){var u=$(this).data("u");if(cfg.use[u]!==undefined)$(this).prop("checked",cfg.use[u])});
+  if(cfg.keep)$(".mk").each(function(){var u=$(this).data("u");if(u&&cfg.keep[u]!==undefined)$(this).val(cfg.keep[u])});
+  if(cfg.mode)$("input[name=mm][value='"+cfg.mode+"']").prop("checked",true);
+  if(cfg.maxH)$("#mqT").val(cfg.maxH);
+  if(cfg.cats)$(".mc").each(function(){var c=$(this).data("c");if(cfg.cats[c]!==undefined)$(this).prop("checked",cfg.cats[c])});
+  if(cfg.auto!==undefined)$("#mqauto").prop("checked",cfg.auto);
+  if(cfg.interval)$("#mqI").val(cfg.interval);
+  if(cfg.group)$("#mqg").val(cfg.group);
+}
+
+function saveSlot(n){
+  try{
+    var cfg={use:{},keep:{},group:$("#mqg").val(),mode:$("input[name=mm]:checked").val(),
+             maxH:$("#mqT").val(),cats:[],auto:$("#mqauto").prop("checked"),interval:$("#mqI").val()};
+    $(".mu").each(function(){cfg.use[$(this).data("u")]=this.checked});
+    $(".mk").each(function(){var u=$(this).data("u");if(u)cfg.keep[u]=this.value});
+    $(".mc").each(function(){cfg.cats[$(this).data("c")]=this.checked});
+    localStorage.setItem(SK+'.s'+n,JSON.stringify(cfg));
+    var btn=$("#mqsave"+n);
+    btn.text("✔ Gespeichert!").css("background","#2d6a1f");
+    setTimeout(function(){btn.text("💾 Speichern "+n).css("background","")},1500);
+  }catch(e){}
+}
+
+function loadSlot(n){
+  try{
+    var raw=localStorage.getItem(SK+'.s'+n);
+    if(!raw){setStatus("Slot "+n+" noch leer — zuerst speichern!","#e05555");return}
+    applySettings(JSON.parse(raw));
+    saveSettings();
+    setStatus("Settings "+n+" geladen ✔","#5cb85c");
+    $(".mq-sl-load").css("border-color","#5a3a08").css("color","#f0e6c8");
+    $("#mqload"+n).css("border-color","#c9a84c").css("color","#c9a84c");
+  }catch(e){}
 }
 
 // ============================================================
@@ -205,7 +239,11 @@ var css=
   '#mqcd-time{font-size:30px;font-weight:bold;color:#c9a84c;letter-spacing:4px;font-family:monospace}'+
   '#mqcd-wrap{background:#130c03;border-radius:3px;height:5px;margin-top:6px;overflow:hidden}'+
   '#mqcd-bar{height:100%;background:linear-gradient(90deg,#7a5010,#c9a84c);border-radius:3px;width:0%;transition:width 1s linear}'+
-  '#mqr{margin-top:4px}';
+  '#mqr{margin-top:4px}'+
+  '.mq-sl-load{background:#3d2606;color:#f0e6c8;border:1px solid #8b6914;border-radius:4px;padding:5px 0;font-size:12px;cursor:pointer;flex:1;transition:background .1s;text-align:center}'+
+  '.mq-sl-load:hover{background:#7a5010}'+
+  '.mq-sl-save{background:#1e1a08;color:#aaa;border:1px solid #444;border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;transition:all .1s}'+
+  '.mq-sl-save:hover{background:#3a3008;color:#f0e6c8;border-color:#8b6914}';
 
 var P=
   '<div id="mqx"><style>'+css+'</style>'+
@@ -240,6 +278,17 @@ var P=
       '<span style="color:#888;font-size:11px">Alle</span>'+
       '<input id="mqI" value="30" style="width:34px;padding:1px 3px;background:#130c03;border:1px solid #5a3a08;border-radius:3px;color:#f0e6c8;text-align:center;font-size:11px">'+
       '<span style="color:#888;font-size:11px">min erneut senden</span>'+
+    '</div>'+
+  '</div>'+
+
+  '<div class="mqs"><div class="mq-lb">&#128190; Gespeicherte Settings</div>'+
+    '<div class="mq-row">'+
+      '<button class="mq-sl-load" id="mqload1">&#128194; Settings 1 laden</button>'+
+      '<button class="mq-sl-save" id="mqsave1">&#128190; Speichern 1</button>'+
+    '</div>'+
+    '<div class="mq-row">'+
+      '<button class="mq-sl-load" id="mqload2">&#128194; Settings 2 laden</button>'+
+      '<button class="mq-sl-save" id="mqsave2">&#128190; Speichern 2</button>'+
     '</div>'+
   '</div>'+
 
@@ -297,6 +346,12 @@ $.get(game_data.link_base_pure+"groups&ajax=load_group_menu",function(r){
     delete window.__mqSavedGroup;
   }
 },"json");
+
+// Settings Slots
+$("#mqload1").click(function(){loadSlot(1)});
+$("#mqload2").click(function(){loadSlot(2)});
+$("#mqsave1").click(function(){saveSlot(1)});
+$("#mqsave2").click(function(){saveSlot(2)});
 
 // Starten
 $("#mqc").click(function(){
