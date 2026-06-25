@@ -27,10 +27,65 @@ function VS(v,st,w){if(v.has_rally_point===false)return[];var rot=[],a=[];for(va
 function LA(cb){var b=(game_data.player.sitter>0?"game.php?t="+game_data.player.id+"&":"game.php?")+"screen=place&mode=scavenge_mass",g=$("#mqg").val();if(g>0)b+="&group="+g;$.get(b,function(dt){dt=""+dt;var w=FW(dt)||{e:.45,s:1800,f:Math.pow(game_data.speed||1,-.55)},mx=0,pm=dt.match(/[?&]page=(\d+)/g)||[];pm.forEach(function(x){var n=+x.replace(/\D/g,"");if(n>mx)mx=n});var us=[];for(var i=0;i<=mx;i++)us.push(b+"&page="+i);var vs=[],ix=0;(function nx(){if(ix>=us.length){cb(vs,w);return}$.get(us[ix],function(d){try{vs=vs.concat(FV(""+d))}catch(e){}ix++;setTimeout(nx,200)}).fail(function(){ix++;setTimeout(nx,200)})})()})}
 
 // ============================================================
-// NEU: Vollautomatisches Absenden
+// STATE & STORAGE
 // ============================================================
-var autoTimer=null, isRunning=false;
+var autoTimer=null, isRunning=false, cdTimer=null;
+var SK='ds.plunder.'+(game_data.world||'x');
 
+function saveSettings(){
+  try{
+    var cfg={use:{},keep:{},group:$("#mqg").val(),mode:$("input[name=mm]:checked").val(),
+             maxH:$("#mqT").val(),cats:[],auto:$("#mqauto").prop("checked"),interval:$("#mqI").val()};
+    $(".mu").each(function(){cfg.use[$(this).data("u")]=this.checked});
+    $(".mk").each(function(){var u=$(this).data("u");if(u)cfg.keep[u]=this.value});
+    $(".mc").each(function(){cfg.cats[$(this).data("c")]=this.checked});
+    localStorage.setItem(SK,JSON.stringify(cfg));
+  }catch(e){}
+}
+
+function loadSettings(){
+  try{
+    var raw=localStorage.getItem(SK);
+    if(!raw)return;
+    var cfg=JSON.parse(raw);
+    if(cfg.use)$(".mu").each(function(){var u=$(this).data("u");if(cfg.use[u]!==undefined)$(this).prop("checked",cfg.use[u])});
+    if(cfg.keep)$(".mk").each(function(){var u=$(this).data("u");if(u&&cfg.keep[u]!==undefined)$(this).val(cfg.keep[u])});
+    if(cfg.mode)$("input[name=mm][value='"+cfg.mode+"']").prop("checked",true);
+    if(cfg.maxH)$("#mqT").val(cfg.maxH);
+    if(cfg.cats)$(".mc").each(function(){var c=$(this).data("c");if(cfg.cats[c]!==undefined)$(this).prop("checked",cfg.cats[c])});
+    if(cfg.auto!==undefined)$("#mqauto").prop("checked",cfg.auto);
+    if(cfg.interval)$("#mqI").val(cfg.interval);
+    if(cfg.group)window.__mqSavedGroup=cfg.group;
+  }catch(e){}
+}
+
+// ============================================================
+// COUNTDOWN TIMER
+// ============================================================
+function startCountdown(ms){
+  clearInterval(cdTimer);
+  var end=Date.now()+ms;
+  $("#mqcd").show();
+  function tick(){
+    var rem=end-Date.now();
+    if(rem<=0){clearInterval(cdTimer);$("#mqcd").hide();return}
+    var m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);
+    $("#mqcd-time").text((m<10?"0"+m:m)+":"+(s<10?"0"+s:s));
+    $("#mqcd-bar").css("width",Math.round((1-rem/ms)*100)+"%");
+  }
+  tick();
+  cdTimer=setInterval(tick,1000);
+}
+
+function stopCountdown(){
+  clearInterval(cdTimer);
+  cdTimer=null;
+  $("#mqcd").hide();
+}
+
+// ============================================================
+// VOLLAUTOMATISCHES ABSENDEN
+// ============================================================
 function setStatus(msg,color){
   $("#mqst").html(msg).css("color",color||"#f0e6c8");
 }
@@ -49,6 +104,7 @@ function sendBatches(bt,onDone){
 }
 
 function buildAndSend(s,autoRepeat){
+  stopCountdown();
   setStatus("Lade Doerfer ...","#c9a84c");
   isRunning=true;
   LA(function(vs,w){
@@ -57,7 +113,8 @@ function buildAndSend(s,autoRepeat){
     if(!all.length){
       if(autoRepeat){
         var wait=(parseFloat($("#mqI").val())||30)*60000;
-        setStatus("Keine Doerfer verfuegbar. Erneut in "+Math.round(wait/60000)+" min ...","#e05555");
+        setStatus("Keine Doerfer verfuegbar — warte ...","#e05555");
+        startCountdown(wait);
         autoTimer=setTimeout(function(){buildAndSend(s,true)},wait);
       }else{
         setStatus("Nichts sendbar.","#e05555");
@@ -71,10 +128,11 @@ function buildAndSend(s,autoRepeat){
     if(cu.length)bt.push(cu);
 
     if(autoRepeat){
-      setStatus(vu+" Doerfer, "+all.length+" Raubzuege — sende automatisch ...","#c9a84c");
+      setStatus(vu+" Doerfer, "+all.length+" Raubzuege — sende ...","#c9a84c");
       sendBatches(bt,function(){
         var wait=(parseFloat($("#mqI").val())||30)*60000;
-        setStatus("✔ Gesendet! Naechste Runde in "+Math.round(wait/60000)+" min ...","#5cb85c");
+        setStatus("&#10004; Gesendet! Naechste Runde:","#5cb85c");
+        startCountdown(wait);
         autoTimer=setTimeout(function(){buildAndSend(s,true)},wait);
       });
     }else{
@@ -82,20 +140,20 @@ function buildAndSend(s,autoRepeat){
       bt.forEach(function(b,i){
         h+='<button class="ms" data-i="'+i+'">Paket '+(i+1)+' ('+b.length+')</button> ';
       });
-      h+='<br><button id="mqsendall">✔ Alle senden</button>';
+      h+='<br><button id="mqsendall">&#10004; Alle senden</button>';
       window.__mqB=bt;
       $("#mqr").html(h);
       $(".ms").click(function(){
         var i=+$(this).data("i"),bn=this;
         bn.disabled=true; bn.textContent="...";
         TribalWars.post("scavenge_api",{ajaxaction:"send_squads"},{squad_requests:window.__mqB[i]},function(){
-          bn.textContent="✔ "+(i+1); bn.style.background="#2d6a1f";
+          bn.textContent="&#10004; "+(i+1); bn.style.background="#2d6a1f";
         },false);
       });
       $("#mqsendall").click(function(){
         var self=$(this); self.prop("disabled",true).text("Sende ...");
         sendBatches(bt,function(){
-          self.text("✔ Alle gesendet!").css("background","#2d6a1f");
+          self.text("&#10004; Alle gesendet!").css("background","#2d6a1f");
           setStatus("Alle Raubzuege gesendet!","#5cb85c");
         });
       });
@@ -107,7 +165,7 @@ function buildAndSend(s,autoRepeat){
 }
 
 // ============================================================
-// NEUES UI-DESIGN
+// UI
 // ============================================================
 var un=U.map(function(u){
   return '<label class="mql"><input type="checkbox" class="mu" data-u="'+u+'" checked> '+u+' <input class="mk" data-u="'+u+'" value="0"></label>';
@@ -141,9 +199,13 @@ var css=
   '.ms:hover:not(:disabled){background:#7a5010}'+
   '#mqsendall{background:linear-gradient(180deg,#a02020,#7a1010);color:#fff;border:1px solid #c03030;border-radius:5px;padding:6px 16px;font-size:12px;cursor:pointer;margin-top:7px;font-weight:bold;display:block;transition:background .15s}'+
   '#mqsendall:hover:not(:disabled){background:linear-gradient(180deg,#c0392b,#9a1a1a)}'+
-  '#mqst{font-size:11px;min-height:14px;margin-top:6px;padding:3px 0}'+
-  '#mqr{margin-top:4px}'+
-  '.mq-divider{border:none;border-top:1px solid #3a2206;margin:6px 0}';
+  '#mqst{font-size:11px;min-height:14px;margin-top:4px;padding:2px 0}'+
+  '#mqcd{display:none;margin:6px 0;background:#271608;border:1px solid #5a3a08;border-radius:6px;padding:8px 10px;text-align:center}'+
+  '#mqcd-lbl{font-size:10px;color:#9b7a1a;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}'+
+  '#mqcd-time{font-size:30px;font-weight:bold;color:#c9a84c;letter-spacing:4px;font-family:monospace}'+
+  '#mqcd-wrap{background:#130c03;border-radius:3px;height:5px;margin-top:6px;overflow:hidden}'+
+  '#mqcd-bar{height:100%;background:linear-gradient(90deg,#7a5010,#c9a84c);border-radius:3px;width:0%;transition:width 1s linear}'+
+  '#mqr{margin-top:4px}';
 
 var P=
   '<div id="mqx"><style>'+css+'</style>'+
@@ -186,32 +248,57 @@ var P=
     '<button id="mqstop">&#9632; Stop</button>'+
   '</div>'+
   '<div id="mqst"></div>'+
+
+  '<div id="mqcd">'+
+    '<div id="mqcd-lbl">&#9201; Naechste Runde in</div>'+
+    '<div id="mqcd-time">00:00</div>'+
+    '<div id="mqcd-wrap"><div id="mqcd-bar"></div></div>'+
+  '</div>'+
+
   '<div id="mqr"></div>'+
   '</div></div>';
 
 $("#mqx").remove();
 $("body").append(P);
 
+// Settings laden
+loadSettings();
+
+// Einstellungen bei jeder Aenderung speichern
+$(document).on("change","#mqx .mu,#mqx .mk,#mqx .mc,#mqx input[name=mm],#mqx #mqauto",saveSettings);
+$(document).on("input","#mqx #mqT,#mqx #mqI",saveSettings);
+$(document).on("change","#mqg",saveSettings);
+
+// X — schliessen
 $("#mqcl").click(function(){
   if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
+  stopCountdown();
   isRunning=false;
   $("#mqx").remove();
 });
 
+// Stop
 $("#mqstop").click(function(){
   if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
+  stopCountdown();
   isRunning=false;
   $(this).hide();
   $("#mqc").prop("disabled",false);
   setStatus("Gestoppt.","#d04040");
 });
 
+// Gruppen laden + gespeicherte Gruppe wiederherstellen
 $.get(game_data.link_base_pure+"groups&ajax=load_group_menu",function(r){
   ((r&&r.result)||[]).map(function(g){
     g.group_id&&$("#mqg").append('<option value="'+g.group_id+'">'+g.name+'</option>');
   });
+  if(window.__mqSavedGroup){
+    $("#mqg").val(window.__mqSavedGroup);
+    delete window.__mqSavedGroup;
+  }
 },"json");
 
+// Starten
 $("#mqc").click(function(){
   if(isRunning)return;
   var auto=$("#mqauto").prop("checked");
@@ -220,6 +307,7 @@ $("#mqc").click(function(){
   $(".mk").each(function(){var u=$(this).data("u");if(u)s.keep[u]=parseInt(this.value,10)||0});
   $(".mc").each(function(){s.cats[$(this).data("c")]=this.checked});
   s.T=(parseFloat($("#mqT").val())||3)*3600;
+  saveSettings();
   $("#mqr").html("");
   $("#mqc").prop("disabled",true);
   if(auto){
