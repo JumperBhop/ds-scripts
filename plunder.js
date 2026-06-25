@@ -319,7 +319,7 @@ $(document).on("input","#mqx #mqT,#mqx #mqI",saveSettings);
 $(document).on("change","#mqg",saveSettings);
 
 // X — schliessen
-$("#mqcl").click(function(){
+$(document).on("click","#mqcl",function(){
   if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
   stopCountdown();
   isRunning=false;
