@@ -1,0 +1,10 @@
+name: jsDelivr Cache leeren
+on:
+  push:
+    branches: [master]
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cache purgen
+        run: curl "https://purge.jsdelivr.net/gh/JumperBhop/ds-scripts@master/plunder.js"
