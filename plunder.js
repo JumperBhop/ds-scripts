@@ -318,13 +318,14 @@ $(document).on("change","#mqx .mu,#mqx .mk,#mqx .mc,#mqx input[name=mm],#mqx #mq
 $(document).on("input","#mqx #mqT,#mqx #mqI",saveSettings);
 $(document).on("change","#mqg",saveSettings);
 
-// X — schliessen
-$(document).on("click","#mqcl",function(){
+// X — schliessen (capture:true feuert vor dem Spiel)
+document.getElementById('mqcl').addEventListener('click',function(){
   if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
   stopCountdown();
   isRunning=false;
-  $("#mqx").remove();
-});
+  var el=document.getElementById('mqx');
+  if(el)el.parentNode.removeChild(el);
+},true);
 
 // Stop
 $("#mqstop").click(function(){
